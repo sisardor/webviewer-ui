@@ -14,7 +14,8 @@ class NoteReply extends React.PureComponent {
     reply: PropTypes.object.isRequired,
     searchInput: PropTypes.string,
     renderAuthorName: PropTypes.func.isRequired,
-    renderContents: PropTypes.func.isRequired
+    renderContents: PropTypes.func.isRequired,
+    measure: PropTypes.func.isRequired
   }
 
   constructor(props) {
@@ -23,6 +24,12 @@ class NoteReply extends React.PureComponent {
     this.state = {
       isEditing: false
     };
+  }
+
+  componentDidUpdate(_, prevState) {
+    if (prevState.isEditing !== this.state.isEditing) {
+      this.props.measure();
+    }
   }
 
   deleteReply = () => {
@@ -58,7 +65,7 @@ class NoteReply extends React.PureComponent {
   }
 
   render() {
-    const { reply, renderContents, searchInput } = this.props;
+    const { reply, renderContents, searchInput, measure } = this.props;
     const { isEditing } = this.state;
 
     return (
@@ -70,6 +77,7 @@ class NoteReply extends React.PureComponent {
           renderContents={renderContents}
           isEditing={isEditing} 
           closeEditing={this.closeEditing} 
+          measure={measure}
         />
       </div>
     );

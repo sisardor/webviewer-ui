@@ -20,9 +20,9 @@ class Note extends React.PureComponent {
     isNoteEditing: PropTypes.bool.isRequired,
     isNoteExpanded: PropTypes.bool.isRequired,
     setIsNoteEditing: PropTypes.func.isRequired,
+    measure: PropTypes.func.isRequired,
     searchInput: PropTypes.string,
     isReadOnly: PropTypes.bool,
-    visible: PropTypes.bool.isRequired,
     t: PropTypes.func.isRequired
   };
 
@@ -41,12 +41,11 @@ class Note extends React.PureComponent {
     core.addEventListener('deleteReply', this.onDeleteReply);
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps, prevState) {
     const { annotation } = this.props;
     const commentEditable = core.canModify(annotation) && !annotation.getContents();
-    const noteBeingEdited = !prevProps.isNoteEditing && this.props.isNoteEditing; 
-    const noteCollapsed = prevProps.isNoteExpanded && !this.props.isNoteExpanded; 
     
+    const noteBeingEdited = !prevProps.isNoteEditing && this.props.isNoteEditing; 
     if (noteBeingEdited) {
       if (commentEditable) {
         this.openRootEditing();
@@ -54,12 +53,21 @@ class Note extends React.PureComponent {
         this.replyTextarea.current.focus();
       }
     }
-
+    
+    const noteCollapsed = prevProps.isNoteExpanded && !this.props.isNoteExpanded; 
     if(noteCollapsed) {
       this.setState({
         isRootContentEditing: false,
         isReplyFocused: false
       });
+    }
+
+    const noteHeightChanged = prevProps.isNoteExpanded !== this.props.isNoteExpanded
+                          || prevState.replies.length !== this.state.replies.length
+                          || prevState.isRootContentEditing !== this.state.isRootContentEditing
+                          || prevState.isReplyFocused !== this.state.isReplyFocused;
+    if (noteHeightChanged) {
+      this.props.measure();
     }
   }
 
@@ -72,7 +80,7 @@ class Note extends React.PureComponent {
     if (parent === this.props.annotation) {
       this.setState({
         replies: [ ...parent.getReplies() ]
-      });
+      }, this.props.measure); // TODO prevState.replies === this.state.replies.length only when adding the first reply
     }
   }
 
@@ -108,7 +116,13 @@ class Note extends React.PureComponent {
   }
 
   onInput = () => {
-    this.replyTextarea.current.style.height = (this.replyTextarea.current.scrollHeight + 2) + 'px';
+    const height = parseFloat(window.getComputedStyle(this.replyTextarea.current).height);
+    const scrollHeight = this.replyTextarea.current.scrollHeight;
+
+    if (height !== scrollHeight + 2) {
+      this.replyTextarea.current.style.height = `${scrollHeight + 2}px`;
+      this.props.measure();
+    } 
   }
 
   onKeyDown = e => {
@@ -191,12 +205,11 @@ class Note extends React.PureComponent {
   }
 
   render() {
-    const { annotation, t, isReadOnly, isNoteExpanded, searchInput, visible }  = this.props;
+    const { annotation, t, isReadOnly, isNoteExpanded, searchInput, measure }  = this.props;
     const { replies, isRootContentEditing, isReplyFocused } = this.state;
     const className = [
       'Note',
-      isNoteExpanded ? 'expanded' : '',
-      visible ? '' : 'hidden'
+      isNoteExpanded ? 'expanded' : ''
     ].join(' ').trim();
 
     return (
@@ -211,6 +224,7 @@ class Note extends React.PureComponent {
           openEditing={this.openRootEditing}
           closeEditing={this.closeRootEditing}
           numberOfReplies={replies.length}
+          measure={measure}
         />
 
         <div className={`replies ${isNoteExpanded ? 'visible' : 'hidden'}`}>
@@ -219,6 +233,7 @@ class Note extends React.PureComponent {
               key={reply.Id} 
               reply={reply} 
               searchInput={searchInput} 
+              measure={measure}
               renderAuthorName={this.renderAuthorName} 
               renderContents={this.renderContents} 
             />
@@ -257,4 +272,4 @@ const matDispatchToProps = {
   setIsNoteEditing: actions.setIsNoteEditing,
 };
 
-export default hot(module)(connect(mapStateToProps, matDispatchToProps)(translate()(Note)));
+export default hot(module)(connect(mapStateToProps, matDispatchToProps)(translate(null, { wait: false })(Note)));

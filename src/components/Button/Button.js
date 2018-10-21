@@ -93,4 +93,4 @@ class Button extends React.PureComponent {
   }
 }
 
-export default translate(null, { wait: false } )(Button);
+export default translate(null, { wait: false })(Button);

@@ -12,6 +12,7 @@ class NoteContents extends React.Component {
     renderContents: PropTypes.func.isRequired,
     annotation: PropTypes.object.isRequired,
     closeEditing: PropTypes.func.isRequired,
+    measure: PropTypes.func.isRequired,
     t: PropTypes.func.isRequired
   }
 
@@ -28,8 +29,13 @@ class NoteContents extends React.Component {
   }
   
   onInput = () => {
-    this.textInput.current.style.height = '30px';
-    this.textInput.current.style.height = (this.textInput.current.scrollHeight + 2) + 'px';
+    const height = parseFloat(window.getComputedStyle(this.textInput.current).height);
+    const scrollHeight = this.textInput.current.scrollHeight;
+
+    if (height !== scrollHeight + 2) {
+      this.textInput.current.style.height = `${scrollHeight + 2}px`;
+      this.props.measure();
+    } 
   }
 
   onKeyDown = e => {
@@ -80,4 +86,4 @@ class NoteContents extends React.Component {
   }
 }
 
-export default translate()(NoteContents);
+export default translate(null, { wait: false })(NoteContents);

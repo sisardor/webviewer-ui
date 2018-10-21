@@ -27,6 +27,7 @@ class NoteRoot extends React.Component {
     sortNotesBy: PropTypes.string.isRequired,
     openEditing: PropTypes.func.isRequired,
     closeEditing: PropTypes.func.isRequired,
+    measure: PropTypes.func.isRequired,
     numberOfReplies: PropTypes.number.isRequired
   }
 
@@ -91,7 +92,7 @@ class NoteRoot extends React.Component {
   }
 
   render() {
-    const { annotation, renderContents, isEditing, closeEditing, searchInput } = this.props;
+    const { annotation, renderContents, isEditing, closeEditing, searchInput, measure } = this.props;
 
     return(
       <div className="NoteRoot">
@@ -102,6 +103,7 @@ class NoteRoot extends React.Component {
           renderContents={renderContents} 
           isEditing={isEditing} 
           closeEditing={closeEditing} 
+          measure={measure}
         />
       </div>
     );

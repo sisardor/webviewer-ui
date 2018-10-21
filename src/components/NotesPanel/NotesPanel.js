@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { CellMeasurer, CellMeasurerCache, List } from 'react-virtualized';
 import { connect } from 'react-redux';
 import { hot } from 'react-hot-loader';
 import { translate } from 'react-i18next';
@@ -17,6 +18,7 @@ import './NotesPanel.scss';
 class NotesPanel extends React.PureComponent {
   static propTypes = {
     isDisabled: PropTypes.bool,
+    isLeftPanelOpen: PropTypes.bool,
     display: PropTypes.string.isRequired,
     sortNotesBy: PropTypes.string.isRequired,
     t: PropTypes.func.isRequired
@@ -28,7 +30,11 @@ class NotesPanel extends React.PureComponent {
       notesToRender: [], 
       searchInput: ''
     };
-    this.visibleNoteIds = new Set();
+    this.cache = new CellMeasurerCache({
+      defaultHeight: 60,
+      fixedWidth: true
+    });
+    this.listRef = React.createRef();
     this.rootAnnotations = [];
     this.updatePanelOnInput = _.debounce(this.updatePanelOnInput.bind(this), 500);
   }
@@ -39,6 +45,18 @@ class NotesPanel extends React.PureComponent {
     core.addEventListener('annotationHidden', this.onAnnotationChanged);
   }
 
+  componentDidUpdate(prevProps, prevState) {
+    if (
+      prevState.notesToRender.length !== this.state.notesToRender.length ||
+      prevProps.sortNotesBy !== this.props.sortNotesBy
+    ) {
+      this.cache.clearAll();
+      if (this.listRef.current) {
+        this.listRef.current.recomputeRowHeights();
+      }
+    }
+  }
+
   componentWillUnmount() {
     core.removeEventListener('documentUnloaded', this.onDocumentUnloaded);
     core.removeEventListener('annotationChanged', this.onAnnotationChanged);
@@ -46,7 +64,6 @@ class NotesPanel extends React.PureComponent {
   }
 
   onDocumentUnloaded = () => {
-    this.visibleNoteIds.clear();
     this.setState({ notesToRender: [] });
   }
 
@@ -54,7 +71,6 @@ class NotesPanel extends React.PureComponent {
     this.rootAnnotations = this.getRootAnnotations();  
     const notesToRender = this.filterAnnotations(this.rootAnnotations, this.state.searchInput);
     
-    this.setVisibleNoteIds(notesToRender);
     this.setState({ notesToRender });
   }
 
@@ -77,7 +93,6 @@ class NotesPanel extends React.PureComponent {
       notesToRender = this.rootAnnotations;
     }
 
-    this.setVisibleNoteIds(notesToRender);
     this.setState({ notesToRender, searchInput });
   }
 
@@ -105,31 +120,41 @@ class NotesPanel extends React.PureComponent {
     return string.search(new RegExp(searchInput, 'i')) !== -1;
   }
 
-  setVisibleNoteIds = visibleNotes => {
-    this.visibleNoteIds.clear();
-
-    visibleNotes.forEach(note => {
-      this.visibleNoteIds.add(note.Id);
-    });
-  }
-
-  getPrevNote = (sortedNotes, currNote) => {
-    const sortedVisibleNotes = sortedNotes.filter(note => this.isVisibleNote(note));
-    const sortedVisibleNoteIds = sortedVisibleNotes.map(note => note.Id);
-    const indexOfCurrNote = sortedVisibleNoteIds.indexOf(currNote.Id);
-
-    return indexOfCurrNote === 0 ? sortedVisibleNotes[indexOfCurrNote] : sortedVisibleNotes[indexOfCurrNote - 1]; 
-  }
-  
-  isVisibleNote = note => this.visibleNoteIds.has(note.Id)
-
   renderNotesPanelContent = () => {
     const {notesToRender} = this.state;
+    const notes = sortMap[this.props.sortNotesBy].getSortedNotes(this.rootAnnotations);
 
     return(
       <React.Fragment>
         <div className={`notes-wrapper ${notesToRender.length ? 'visible' : 'hidden'}`}>
-          {this.renderNotes(sortMap[this.props.sortNotesBy].getSortedNotes(this.rootAnnotations))}
+          <List
+            ref={this.listRef}
+            width={300}
+            height={500}
+            rowCount={notes.length}
+            deferredMeasurementCache={this.cache}
+            rowHeight={this.cache.rowHeight}
+            rowRenderer={({ key, index, style, parent }) => (
+              <CellMeasurer
+                cache={this.cache}
+                columnIndex={0}
+                key={key}
+                parent={parent}
+                rowIndex={index}
+              >
+                {({ measure }) => (
+                  <div className="note-wrapper" style={{ ...style}}>
+                    {this.renderListSeparator(notes, index)}
+                    <Note
+                      annotation={notes[index]}
+                      searchInput={this.state.searchInput}
+                      measure={measure}
+                    />
+                  </div>
+                )}
+              </CellMeasurer>
+            )}
+          />
         </div>
         <div className={`no-results ${notesToRender.length ? 'hidden' : 'visible'}`}>
           {this.props.t('message.noResults')}
@@ -138,26 +163,13 @@ class NotesPanel extends React.PureComponent {
     );
   }
 
-  renderNotes = notes => {
-    return(
-      notes.map(note => {
-        return (
-          <React.Fragment key={note.Id}>
-            {this.renderListSeparator(notes, note)}
-            <Note visible={this.isVisibleNote(note)} annotation={note} searchInput={this.state.searchInput} />
-          </React.Fragment>
-        );
-      })
-    );
-  }
-
-  renderListSeparator = (notes, currNote) => {
+  renderListSeparator = (notes, index) => {
     const { shouldRenderSeparator, getSeparatorContent } = sortMap[this.props.sortNotesBy];
-    const prevNote = this.getPrevNote(notes, currNote);
+    const currNote = notes[index];
+    const prevNote = index === 0 ? currNote: notes[index-1];
     const isFirstNote = prevNote === currNote;
 
     if (
-      this.isVisibleNote(currNote) &&
       shouldRenderSeparator && 
       getSeparatorContent &&
       (isFirstNote || shouldRenderSeparator(prevNote, currNote))
@@ -169,9 +181,9 @@ class NotesPanel extends React.PureComponent {
   }
 
   render() {
-    const { isDisabled, display, t } = this.props;
+    const { isDisabled, isLeftPanelOpen, display, t } = this.props;
 
-    if (isDisabled) {
+    if (isDisabled || !isLeftPanelOpen) {
       return null;
     }
 
@@ -198,6 +210,7 @@ class NotesPanel extends React.PureComponent {
 
 const mapStatesToProps = state => ({
   sortNotesBy: selectors.getSortNotesBy(state),
+  isLeftPanelOpen: selectors.isElementOpen(state, 'leftPanel'),
   isDisabled: selectors.isElementDisabled(state, 'notesPanel'),
 });
 
