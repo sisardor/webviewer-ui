@@ -17,7 +17,6 @@ import './NotesPanel.scss';
 class NotesPanel extends React.PureComponent {
   static propTypes = {
     isDisabled: PropTypes.bool,
-    isLeftPanelOpen: PropTypes.bool,
     display: PropTypes.string.isRequired,
     sortNotesBy: PropTypes.string.isRequired,
     t: PropTypes.func.isRequired
@@ -26,7 +25,7 @@ class NotesPanel extends React.PureComponent {
   constructor() {
     super();
     this.state = {
-      notesToRender: [], 
+      noteStates: {}, 
       searchInput: ''
     };
     this.cache = new CellMeasurerCache({
@@ -40,45 +39,124 @@ class NotesPanel extends React.PureComponent {
 
   componentDidMount() {
     core.addEventListener('documentUnloaded', this.onDocumentUnloaded);
+    core.addEventListener('addReply', this.onAddReply);
+    core.addEventListener('deleteReply', this.onDeleteReply);
     core.addEventListener('annotationChanged', this.onAnnotationChanged);
     core.addEventListener('annotationHidden', this.onAnnotationChanged);
   }
 
   componentDidUpdate(prevProps, prevState) {
     if (
-      prevState.notesToRender.length !== this.state.notesToRender.length ||
+      Object.keys(prevState.noteStates).length !== Object.keys(this.state.noteStates).length ||
       prevProps.sortNotesBy !== this.props.sortNotesBy
     ) {
       this.cache.clearAll();
       if (this.listRef.current) {
         this.listRef.current.recomputeRowHeights();
+        this.listRef.current.forceUpdateGrid();
       }
     }
   }
 
   componentWillUnmount() {
     core.removeEventListener('documentUnloaded', this.onDocumentUnloaded);
+    core.removeEventListener('addReply', this.onAddReply);
+    core.removeEventListener('deleteReply', this.onDeleteReply);
     core.removeEventListener('annotationChanged', this.onAnnotationChanged);
     core.removeEventListener('annotationHidden', this.onAnnotationChanged);
   }
 
   onDocumentUnloaded = () => {
-    this.setState({ notesToRender: [] });
+    this.setState({ noteStates: {} });
+  }
+
+  onAddReply = (e, reply, parent) => {
+    this.setNoteState(parent.Id, {
+      replies: {
+        ...this.state.noteStates[parent.Id].replies,
+        [reply.Id]: { isReplyFocused: false }
+      }
+    });
+  }
+
+  onDeleteReply = (e, reply, parent) => {
+    const replies = { ...this.state.noteStates[parent.Id].replies };
+    
+    delete replies[reply.Id];
+    setTimeout(() => {
+      this.setNoteState(parent.Id, { replies });
+    }, 0);
   }
 
   onAnnotationChanged = () => {
-    this.rootAnnotations = this.getRootAnnotations();  
+    this.setRootAnnotations();
+
     const notesToRender = this.filterAnnotations(this.rootAnnotations, this.state.searchInput);
-    
-    this.setState({ notesToRender });
+    this.setNoteStates(notesToRender);
   }
 
-  getRootAnnotations = () => core.getAnnotationsList().filter(annotation => annotation.Listable && !annotation.isReply() && !annotation.Hidden);
+  setNoteState = (Id, newState) => {
+    if (!this.state.noteStates[Id]) {
+      return;
+    }
+
+    this.setState({
+      noteStates: {
+        ...this.state.noteStates,
+        [Id]: {
+          ...this.state.noteStates[Id],
+          ...newState
+        }
+      }
+    });
+  }
+
+  setRootAnnotations = () => {
+    this.rootAnnotations = core.getAnnotationsList().filter(annotation => annotation.Listable && !annotation.isReply() && !annotation.Hidden);
+  }
+
+  /*
+    {
+      id: {
+        annotation
+        isNoteExpanded,
+        isRootContentEditing,
+        isReplyFocused,
+        replies: {
+          id: { isReplyContentEditing }
+          ...
+        }
+      }
+      ...
+    }
+  */
+
+  setNoteStates = notesToRender => {
+    const noteStates = notesToRender.reduce((noteStates, note) => {
+      let noteState = this.state.noteStates[note.Id]; 
+      if (!noteState) {
+        noteState = {
+          annotation: note,
+          isRootContentEditing: false,
+          isReplyFocused: false,
+          replies: note.getReplies().reduce((replies, reply) => {
+            replies[reply.Id] = { isReplyFocused: false };
+            return replies;
+          }, {})
+        };
+      }
+
+      noteStates[note.Id] = noteState;
+      return noteStates;
+    }, {});
+
+    this.setState({ noteStates });
+  } 
 
   handleInputChange = e => {
     const searchInput = e.target.value;
 
-    this.updatePanelOnInput(searchInput);
+    // this.updatePanelOnInput(searchInput);
   }
 
   updatePanelOnInput = searchInput => {
@@ -88,7 +166,7 @@ class NotesPanel extends React.PureComponent {
     if (searchInput.trim()) {
       notesToRender = this.filterAnnotations(this.rootAnnotations, searchInput);
       core.selectAnnotations(notesToRender); 
-    } else {
+    } else { 
       notesToRender = this.rootAnnotations;
     }
 
@@ -120,8 +198,9 @@ class NotesPanel extends React.PureComponent {
   }
 
   renderNotesPanelContent = () => {
-    const {notesToRender} = this.state;
-    const notes = sortMap[this.props.sortNotesBy].getSortedNotes(this.rootAnnotations);
+    const { noteStates } = this.state;
+    let notesToRender = Object.keys(noteStates).map(core.getAnnotationById);
+    notesToRender = sortMap[this.props.sortNotesBy].getSortedNotes(notesToRender);
 
     return(
       <React.Fragment>
@@ -130,9 +209,10 @@ class NotesPanel extends React.PureComponent {
             ref={this.listRef}
             width={300}
             height={500}
-            rowCount={notes.length}
+            rowCount={notesToRender.length}
             deferredMeasurementCache={this.cache}
             rowHeight={this.cache.rowHeight}
+            // noteStates={this.state.noteStates}
             rowRenderer={({ key, index, style, parent }) => (
               <CellMeasurer
                 cache={this.cache}
@@ -143,9 +223,10 @@ class NotesPanel extends React.PureComponent {
               >
                 {({ measure }) => (
                   <div className="note-wrapper" style={{ ...style}}>
-                    {this.renderListSeparator(notes, index)}
+                    {this.renderListSeparator(notesToRender, index)}
                     <Note
-                      annotation={notes[index]}
+                      {...noteStates[notesToRender[index].Id]}
+                      setNoteState={this.setNoteState}
                       searchInput={this.state.searchInput}
                       measure={measure}
                     />
@@ -180,12 +261,12 @@ class NotesPanel extends React.PureComponent {
   }
 
   render() {
-    const { isDisabled, isLeftPanelOpen, display, t } = this.props;
+    const { isDisabled, display, t } = this.props;
 
-    if (isDisabled || !isLeftPanelOpen) {
+    if (isDisabled) {
       return null;
     }
-
+    
     return (
       <div className="Panel NotesPanel" style={{ display }} data-element="notesPanel" onClick={() => core.deselectAllAnnotations()}>
         {this.rootAnnotations.length === 0 
@@ -209,8 +290,7 @@ class NotesPanel extends React.PureComponent {
 
 const mapStatesToProps = state => ({
   sortNotesBy: selectors.getSortNotesBy(state),
-  isLeftPanelOpen: selectors.isElementOpen(state, 'leftPanel'),
-  isDisabled: selectors.isElementDisabled(state, 'notesPanel'),
+  isDisabled: selectors.isElementDisabled(state, 'notesPanel')
 });
 
 export default connect(mapStatesToProps)(translate()(NotesPanel));

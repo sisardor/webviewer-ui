@@ -20,6 +20,8 @@ export const getActiveToolStyles = state => state.viewer.activeToolStyles;
 export const getActiveLeftPanel = state => state.viewer.activeLeftPanel;
 export const getActiveToolGroup = state => state.viewer.activeToolGroup;
 export const getNotePopupId = state => state.viewer.notePopupId;
+export const getExpandedNotes = state => state.viewer.expandedNotes;
+export const getIsNoteEditing = state => state.viewer.isNoteEditing;
 export const isNoteExpanded = (state, id) => !!state.viewer.expandedNotes[id];
 export const isNoteEditing = (state, id) => state.viewer.isNoteEditing && isNoteExpanded(state, id);
 export const getFitMode = state => state.viewer.fitMode;

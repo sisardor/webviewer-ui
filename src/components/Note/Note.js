@@ -18,7 +18,11 @@ class Note extends React.PureComponent {
     annotation: PropTypes.object.isRequired,
     isNoteEditing: PropTypes.bool.isRequired,
     isNoteExpanded: PropTypes.bool.isRequired,
+    isRootContentEditing: PropTypes.bool.isRequired,
+    isReplyFocused: PropTypes.bool.isRequired,
     setIsNoteEditing: PropTypes.func.isRequired,
+    setNoteState: PropTypes.func.isRequired,
+    replies: PropTypes.object.isRequired,
     measure: PropTypes.func.isRequired,
     searchInput: PropTypes.string,
     isReadOnly: PropTypes.bool,
@@ -28,20 +32,10 @@ class Note extends React.PureComponent {
   constructor(props) {
     super(props);
     this.replyTextarea = React.createRef();
-    this.state = {
-      replies: props.annotation.getReplies(),
-      isRootContentEditing: false,
-      isReplyFocused: false
-    };
   }
 
-  componentDidMount() {
-    core.addEventListener('addReply', this.onAddReply);
-    core.addEventListener('deleteReply', this.onDeleteReply);
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    const { annotation } = this.props;
+  componentDidUpdate(prevProps) {
+    const { annotation, setNoteState } = this.props;
     const commentEditable = core.canModify(annotation) && !annotation.getContents();
     
     const noteBeingEdited = !prevProps.isNoteEditing && this.props.isNoteEditing; 
@@ -54,40 +48,19 @@ class Note extends React.PureComponent {
     }
     
     const noteCollapsed = prevProps.isNoteExpanded && !this.props.isNoteExpanded; 
-    if(noteCollapsed) {
-      this.setState({
+    if (noteCollapsed) {
+      setNoteState(annotation.Id, {
         isRootContentEditing: false,
         isReplyFocused: false
       });
     }
 
     const noteHeightChanged = prevProps.isNoteExpanded !== this.props.isNoteExpanded
-                          || prevState.replies.length !== this.state.replies.length
-                          || prevState.isRootContentEditing !== this.state.isRootContentEditing
-                          || prevState.isReplyFocused !== this.state.isReplyFocused;
+                          || Object.keys(prevProps.replies).length !== Object.keys(this.props.replies).length
+                          || prevProps.isRootContentEditing !== this.props.isRootContentEditing
+                          || prevProps.isReplyFocused !== this.props.isReplyFocused;
     if (noteHeightChanged) {
       this.props.measure();
-    }
-  }
-
-  componentWillUnmount() {
-    core.removeEventListener('addReply', this.onAddReply);
-    core.removeEventListener('deleteReply', this.onDeleteReply);
-  }
-
-  onAddReply = (e, reply, parent) => {
-    if (parent === this.props.annotation) {
-      this.setState({
-        replies: [ ...parent.getReplies() ]
-      }, this.props.measure); // TODO prevState.replies === this.state.replies.length only when adding the first reply
-    }
-  }
-
-  onDeleteReply = (e, reply, parent) => {
-    if (parent === this.props.annotation) {
-      this.setState({
-        replies: parent.getReplies().filter(a => a !== reply)
-      });
     }
   }
 
@@ -106,12 +79,16 @@ class Note extends React.PureComponent {
   }
 
   openRootEditing = () => {
-    this.setState({ isRootContentEditing: true });
+    const { annotation, setNoteState } = this.props;
+
+    setNoteState(annotation.Id, { isRootContentEditing: true });
   }
 
   closeRootEditing = () => {
-    this.setState({ isRootContentEditing: false });
-    this.props.setIsNoteEditing(false);
+    const { annotation, setNoteState, setIsNoteEditing } = this.props;
+
+    setNoteState(annotation.Id, { isRootContentEditing: false });
+    setIsNoteEditing(false);
   }
 
   onInput = () => {
@@ -131,26 +108,36 @@ class Note extends React.PureComponent {
   }
 
   onFocus = () => {
-    this.setState({ isReplyFocused: true, isRootContentEditing: false });
+    const { annotation, setNoteState } = this.props;
+    
+    setNoteState(annotation.Id, { 
+      isReplyFocused: true, 
+      isRootContentEditing: false
+    });
   }
 
   onBlur = () => {
-    this.setState({ isReplyFocused: false });
-    this.props.setIsNoteEditing(false);
+    const { annotation, setNoteState, setIsNoteEditing } = this.props;
+
+    setNoteState(annotation.Id, { isReplyFocused: false });
+    setIsNoteEditing(false);
   }
 
   postReply = e => {
     e.preventDefault();
 
-    if (this.replyTextarea.current.value.trim().length > 0) {
-      core.createAnnotationReply(this.props.annotation, this.replyTextarea.current.value);
+    const { value } = this.replyTextarea.current;
+    if (value.trim().length > 0) {
+      core.createAnnotationReply(this.props.annotation, value);
       this.clearReply();
     }
   }
 
   onClickCancel = () => {
+    const { annotation, setNoteState } = this.props;
+    
     this.clearReply();
-    this.setState({ isReplyFocused: false });
+    setNoteState(annotation.Id, { isReplyFocused: false }); 
     // This is for IE Edge
     this.replyTextarea.current.blur();
   }
@@ -204,8 +191,17 @@ class Note extends React.PureComponent {
   }
 
   render() {
-    const { annotation, t, isReadOnly, isNoteExpanded, searchInput, measure }  = this.props;
-    const { replies, isRootContentEditing, isReplyFocused } = this.state;
+    const { 
+      annotation, 
+      t, 
+      isReadOnly, 
+      isNoteExpanded, 
+      searchInput, 
+      measure,
+      replies, 
+      isRootContentEditing, 
+      isReplyFocused,
+    }  = this.props;
     const className = [
       'Note',
       isNoteExpanded ? 'expanded' : ''
@@ -222,12 +218,12 @@ class Note extends React.PureComponent {
           isEditing={isRootContentEditing}
           openEditing={this.openRootEditing}
           closeEditing={this.closeRootEditing}
-          numberOfReplies={replies.length}
+          numberOfReplies={Object.keys(replies).length}
           measure={measure}
         />
 
         <div className={`replies ${isNoteExpanded ? 'visible' : 'hidden'}`}>
-          {replies.map(reply => 
+          {Object.keys(replies).map(core.getAnnotationById).map(reply => 
             <NoteReply 
               key={reply.Id} 
               reply={reply} 
