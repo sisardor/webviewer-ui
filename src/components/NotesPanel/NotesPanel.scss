@@ -33,13 +33,16 @@
   }
 
   .notes-wrapper {
-    overflow: auto;
-
     &.visible {
+      flex-grow: 1;
       display: block;
     }
     &.hidden {
       display: none;
     }
+  }
+
+  .ReactVirtualized__List {
+    outline: none;
   }
 }

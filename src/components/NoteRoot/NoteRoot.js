@@ -23,18 +23,12 @@ class NoteRoot extends React.Component {
     renderAuthorName: PropTypes.func.isRequired,
     renderContents: PropTypes.func.isRequired,
     isNoteExpanded: PropTypes.bool.isRequired,
-    isEditing: PropTypes.bool.isRequired,
+    isRootContentEditing: PropTypes.bool.isRequired,
     sortNotesBy: PropTypes.string.isRequired,
     openEditing: PropTypes.func.isRequired,
     closeEditing: PropTypes.func.isRequired,
-    measure: PropTypes.func.isRequired,
-    numberOfReplies: PropTypes.number.isRequired
   }
-
-  constructor(props) { 
-    super(props);
-  }
-
+  
   componentDidMount() {
     core.addEventListener('annotationChanged', this.onAnnotationChanged);
   }
@@ -56,10 +50,11 @@ class NoteRoot extends React.Component {
   }
 
   renderHeader = () => {
-    const { annotation, isNoteExpanded, sortNotesBy, openEditing, renderAuthorName, numberOfReplies } = this.props;
+    const { annotation, isNoteExpanded, sortNotesBy, openEditing, renderAuthorName } = this.props;
     const type = getAnnotationType(annotation);
     const icon = getAnnotationIcon(type);
     const color = annotationColorToCss(annotation[getAnnotationColor(type)]);
+    const numberOfReplies = Object.keys(this.props.replies).length;
 
     return (
       <div className="title">
@@ -82,8 +77,7 @@ class NoteRoot extends React.Component {
           }
         </div>
         <NotePopup 
-          annotation={annotation} 
-          isNoteExpanded={isNoteExpanded} 
+          {...this.props}
           openEditing={openEditing} 
           onDelete={this.deleteNote} 
         />
@@ -92,18 +86,12 @@ class NoteRoot extends React.Component {
   }
 
   render() {
-    const { annotation, renderContents, isEditing, closeEditing, searchInput, measure } = this.props;
-
     return(
       <div className="NoteRoot">
         {this.renderHeader()}
         <NoteContents 
-          annotation={annotation} 
-          searchInput={searchInput} 
-          renderContents={renderContents} 
-          isEditing={isEditing} 
-          closeEditing={closeEditing} 
-          measure={measure}
+          {...this.props}
+          isEditing={this.props.isRootContentEditing} 
         />
       </div>
     );

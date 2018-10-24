@@ -11,23 +11,25 @@ import './NoteReply.scss';
 
 class NoteReply extends React.PureComponent {
   static propTypes = {
+    annotation: PropTypes.object.isRequired,
     reply: PropTypes.object.isRequired,
+    replies: PropTypes.object.isRequired,
     searchInput: PropTypes.string,
+    canModify: PropTypes.bool.isRequired,
     renderAuthorName: PropTypes.func.isRequired,
     renderContents: PropTypes.func.isRequired,
+    setNoteState: PropTypes.func.isRequired,
     measure: PropTypes.func.isRequired
   }
 
   constructor(props) {
     super(props);
     this.noteContents = React.createRef();
-    this.state = {
-      isEditing: false
-    };
   }
 
-  componentDidUpdate(_, prevState) {
-    if (prevState.isEditing !== this.state.isEditing) {
+  componentDidUpdate(prevProps) {
+    const Id = this.props.reply.Id;
+    if (prevProps.replies[Id].isReplyContentEditing !== this.props.replies[Id].isReplyContentEditing) {
       this.props.measure();
     }
   }
@@ -37,15 +39,29 @@ class NoteReply extends React.PureComponent {
   }
 
   openEditing = () => {
-    this.setState({ isEditing: true });
+    this.setIsReplyContentEditing(true);
   }
 
   closeEditing = () => {
-    this.setState({ isEditing: false });
+    this.setIsReplyContentEditing(false);
+  }
+
+  setIsReplyContentEditing = isReplyContentEditing => {
+    const { setNoteState, annotation, replies, reply } = this.props;
+
+    setNoteState(annotation.Id, {
+      replies: {
+        ...replies,
+        [reply.Id]: {
+          isReplyContentEditing,
+          canModify: core.canModify(reply)  
+        }
+      }
+    });
   }
 
   renderHeader = () => {
-    const { reply, renderAuthorName } = this.props;
+    const { reply, renderAuthorName, replies } = this.props;
 
     return (
       <div className="title">
@@ -56,6 +72,7 @@ class NoteReply extends React.PureComponent {
         </span>
         <NotePopup 
           annotation={reply} 
+          canModify={replies[reply.Id].canModify}
           isNoteExpanded 
           openEditing={this.openEditing} 
           onDelete={this.deleteReply} 
@@ -65,8 +82,14 @@ class NoteReply extends React.PureComponent {
   }
 
   render() {
-    const { reply, renderContents, searchInput, measure } = this.props;
-    const { isEditing } = this.state;
+    const { 
+      reply, 
+      renderContents, 
+      searchInput,
+      measure, 
+      replies,
+      setNoteState,
+    } = this.props;
 
     return (
       <div className="NoteReply" onClick={e => e.stopPropagation()}>
@@ -74,8 +97,9 @@ class NoteReply extends React.PureComponent {
         <NoteContents 
           annotation={reply}
           searchInput={searchInput}
+          setNoteState={setNoteState}
           renderContents={renderContents}
-          isEditing={isEditing} 
+          isEditing={replies[reply.Id].isReplyContentEditing} 
           closeEditing={this.closeEditing} 
           measure={measure}
         />

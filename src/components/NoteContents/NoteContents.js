@@ -10,10 +10,12 @@ class NoteContents extends React.Component {
   static propTypes = {
     isEditing: PropTypes.bool.isRequired,
     renderContents: PropTypes.func.isRequired,
+    setNoteState: PropTypes.func.isRequired,
     annotation: PropTypes.object.isRequired,
     closeEditing: PropTypes.func.isRequired,
     measure: PropTypes.func.isRequired,
-    t: PropTypes.func.isRequired
+    t: PropTypes.func.isRequired,
+    parent: PropTypes.object,
   }
 
   constructor(props) {
@@ -29,19 +31,23 @@ class NoteContents extends React.Component {
   }
   
   onInput = () => {
-    const height = parseFloat(window.getComputedStyle(this.textInput.current).height);
-    const scrollHeight = this.textInput.current.scrollHeight;
-
-    if (height !== scrollHeight + 2) {
-      this.textInput.current.style.height = `${scrollHeight + 2}px`;
-      this.props.measure();
-    } 
+    this.textInput.current.style.height = '30px';
+    this.textInput.current.style.height = `${this.textInput.current.scrollHeight + 2}px`;
+    this.props.measure();
   }
 
   onKeyDown = e => {
     if ((e.metaKey || e.ctrlKey) && e.which === 13) { // (Cmd/Ctrl + Enter)
       this.setContents(e);
     }
+  }
+
+  onFocus = () => {
+    const { annotation, setNoteState } = this.props;
+
+    setNoteState(core.getRootAnnotation(annotation).Id, {
+      isReplyFocused: false
+    });
   }
 
   setContents = e => {
@@ -69,11 +75,12 @@ class NoteContents extends React.Component {
             ref={this.textInput} 
             onInput={this.onInput} 
             onKeyDown={this.onKeyDown}
+            onFocus={this.onFocus}
             onBlur={closeEditing} 
             defaultValue={contents} 
             placeholder="Comment..." 
           />
-          <span className="buttons">
+          <span className="buttons" onMouseDown={e => e.preventDefault()}>
             <button onMouseDown={this.setContents}>{t('action.save')}</button>
             <button onMouseDown={closeEditing}>{t('action.cancel')}</button>
           </span>

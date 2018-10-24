@@ -16,16 +16,10 @@ class NotePopup extends React.Component {
     annotation: PropTypes.object.isRequired,
     notePopupId: PropTypes.string.isRequired,
     isNoteExpanded: PropTypes.bool.isRequired,
+    canModify: PropTypes.bool.isRequired,
     setNotePopupId: PropTypes.func.isRequired,
     openEditing: PropTypes.func.isRequired,
     onDelete: PropTypes.func.isRequired
-  }
-
-  constructor(props) {
-    super(props);
-    this.state = { 
-      canModify: core.canModify(props.annotation)
-    };
   }
 
   componentDidMount() {
@@ -37,9 +31,7 @@ class NotePopup extends React.Component {
   }
 
   onUpdateAnnotationPermission = () => {
-    this.setState({
-      canModify: core.canModify(this.props.annotation)
-    });
+
   }
 
   togglePopup = () => {
@@ -62,8 +54,7 @@ class NotePopup extends React.Component {
   }
 
   render() {
-    const { canModify } = this.state;
-    const { isNoteExpanded, notePopupId, annotation, onDelete } = this.props;
+    const { canModify, isNoteExpanded, notePopupId, annotation, onDelete } = this.props;
     const isOpen = notePopupId === annotation.Id;
     const className = getClassName('modify', { isOpen });
 

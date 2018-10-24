@@ -92,13 +92,9 @@ class Note extends React.PureComponent {
   }
 
   onInput = () => {
-    const height = parseFloat(window.getComputedStyle(this.replyTextarea.current).height);
-    const scrollHeight = this.replyTextarea.current.scrollHeight;
-
-    if (height !== scrollHeight + 2) {
-      this.replyTextarea.current.style.height = `${scrollHeight + 2}px`;
-      this.props.measure();
-    } 
+    this.replyTextarea.current.style.height = '30px';
+    this.replyTextarea.current.style.height = `${this.replyTextarea.current.scrollHeight + 2}px`;
+    this.props.measure();
   }
 
   onKeyDown = e => {
@@ -191,17 +187,7 @@ class Note extends React.PureComponent {
   }
 
   render() {
-    const { 
-      annotation, 
-      t, 
-      isReadOnly, 
-      isNoteExpanded, 
-      searchInput, 
-      measure,
-      replies, 
-      isRootContentEditing, 
-      isReplyFocused,
-    }  = this.props;
+    const { t, isReadOnly, isNoteExpanded, replies, isReplyFocused } = this.props;
     const className = [
       'Note',
       isNoteExpanded ? 'expanded' : ''
@@ -210,25 +196,19 @@ class Note extends React.PureComponent {
     return (
       <div className={className} onClick={this.onClickNote}>
         <NoteRoot
-          annotation={annotation}
-          searchInput={searchInput}
+          {...this.props}
           renderAuthorName={this.renderAuthorName}
           renderContents={this.renderContents}
-          isNoteExpanded={isNoteExpanded}
-          isEditing={isRootContentEditing}
           openEditing={this.openRootEditing}
           closeEditing={this.closeRootEditing}
-          numberOfReplies={Object.keys(replies).length}
-          measure={measure}
         />
 
         <div className={`replies ${isNoteExpanded ? 'visible' : 'hidden'}`}>
           {Object.keys(replies).map(core.getAnnotationById).map(reply => 
             <NoteReply 
+              {...this.props}
               key={reply.Id} 
               reply={reply} 
-              searchInput={searchInput} 
-              measure={measure}
               renderAuthorName={this.renderAuthorName} 
               renderContents={this.renderContents} 
             />
