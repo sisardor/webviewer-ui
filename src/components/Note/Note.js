@@ -55,8 +55,7 @@ class Note extends React.PureComponent {
       });
     }
 
-    const noteHeightChanged = prevProps.isNoteExpanded !== this.props.isNoteExpanded
-                          || Object.keys(prevProps.replies).length !== Object.keys(this.props.replies).length
+    const noteHeightChanged = Object.keys(prevProps.replies).length !== Object.keys(this.props.replies).length                       
                           || prevProps.isRootContentEditing !== this.props.isRootContentEditing
                           || prevProps.isReplyFocused !== this.props.isReplyFocused;
     if (noteHeightChanged) {

@@ -17,9 +17,9 @@ import './NotesPanel.scss';
 class NotesPanel extends React.PureComponent {
   static propTypes = {
     isDisabled: PropTypes.bool,
-    isLeftPanelOpen: PropTypes.bool,
     display: PropTypes.string.isRequired,
     sortNotesBy: PropTypes.string.isRequired,
+    expandedNotes: PropTypes.object.isRequired,
     t: PropTypes.func.isRequired
   }
   
@@ -49,14 +49,11 @@ class NotesPanel extends React.PureComponent {
 
   componentDidUpdate(prevProps, prevState) {
     if (
-      Object.keys(prevState.noteStates).length !== Object.keys(this.state.noteStates).length ||
-      prevProps.sortNotesBy !== this.props.sortNotesBy
+      prevProps.sortNotesBy !== this.props.sortNotesBy ||
+      prevProps.expandedNotes !== this.props.expandedNotes ||
+      Object.keys(prevState.noteStates).length !== Object.keys(this.state.noteStates).length
     ) {
-      this.cache.clearAll();
-      if (this.listRef.current) {
-        this.listRef.current.recomputeRowHeights();
-        this.listRef.current.forceUpdateGrid();
-      }
+      this.updateList();
     }
   }
 
@@ -94,21 +91,6 @@ class NotesPanel extends React.PureComponent {
     }, 0);
   }
 
-  onAnnotationSelected = (e, annotations, action) => {
-    if ( action === 'selected' && annotations.length === 1) {
-      const notes = Object.keys(this.state.noteStates).map(core.getAnnotationById);
-      const sortedNotes = sortMap[this.props.sortNotesBy].getSortedNotes(notes);
-
-      this.listRef.current.scrollToRow(sortedNotes.findIndex(note => note.Id === annotations[0].Id)); 
-    }
-  }
-
-  onAnnotationChanged = () => {
-    this.setRootAnnotations();
-    const notesToRender = this.filterAnnotations(this.rootAnnotations, this.state.searchInput);
-    this.setState({ noteStates: this.getNoteStates(notesToRender) });
-  }
-
   setNoteState = (Id, newState) => {
     if (!this.state.noteStates[Id]) {
       return;
@@ -123,6 +105,35 @@ class NotesPanel extends React.PureComponent {
         }
       }
     });
+  }
+
+  onAnnotationSelected = (e, annotations, action) => {
+    if ( action === 'selected' && annotations.length === 1) {
+      const selectedNoteIndex = this.getSortedNotes(this.state.noteStates).findIndex(note => note.Id === annotations[0].Id);
+
+      this.listRef.current.scrollToRow(selectedNoteIndex); 
+    }
+  }
+
+  onAnnotationChanged = () => {
+    // TODO, this causes unnecessary rerendering sometimes. 
+    // for example, changing the color of an annotation will also trigger this event.
+    this.setRootAnnotations();
+    const notesToRender = this.filterAnnotations(this.rootAnnotations, this.state.searchInput);
+    this.setState({ noteStates: this.getNoteStates(notesToRender) }, this.updateList);  
+  }
+
+  getSortedNotes = noteStates => {
+    const notes = Object.keys(noteStates).map(core.getAnnotationById);
+    
+    return sortMap[this.props.sortNotesBy].getSortedNotes(notes);
+  }
+
+  updateList = () => {
+    this.cache.clearAll();
+    if (this.listRef.current) {
+      this.listRef.current.recomputeRowHeights();
+    }
   }
 
   setRootAnnotations = () => {
@@ -202,8 +213,9 @@ class NotesPanel extends React.PureComponent {
 
   renderNotesPanelContent = () => {
     const { noteStates } = this.state;
-    let notesToRender = Object.keys(noteStates).map(core.getAnnotationById);
-    notesToRender = sortMap[this.props.sortNotesBy].getSortedNotes(notesToRender);
+    const notesToRender = this.getSortedNotes(noteStates);
+
+    console.log(notesToRender);
 
     return(
       <React.Fragment>
@@ -217,11 +229,13 @@ class NotesPanel extends React.PureComponent {
                 rowCount={notesToRender.length}
                 deferredMeasurementCache={this.cache}
                 rowHeight={this.cache.rowHeight}
-                rowRenderer={({ key, index, style, parent }) => (
+                rowRenderer={({ index, style, parent }) => (
                   <CellMeasurer
                     cache={this.cache}
                     columnIndex={0}
-                    key={key}
+                    // If using the default key provided rowRenderer, when inserting a new row at the beginning,
+                    // it seems RV will insert it at the end, which will have wrong textarea value. So we use a 'custom' key here
+                    key={notesToRender[index].Id} 
                     parent={parent}
                     rowIndex={index}
                   >
@@ -267,9 +281,9 @@ class NotesPanel extends React.PureComponent {
   }
 
   render() {
-    const { isDisabled, isLeftPanelOpen, display, t } = this.props;
+    const { isDisabled, display, t } = this.props;
 
-    if (isDisabled || !isLeftPanelOpen) {
+    if (isDisabled) {
       return null;
     }
     
@@ -303,7 +317,7 @@ class NotesPanel extends React.PureComponent {
 const mapStatesToProps = state => ({
   sortNotesBy: selectors.getSortNotesBy(state),
   isDisabled: selectors.isElementDisabled(state, 'notesPanel'),
-  isLeftPanelOpen: selectors.isElementOpen(state, 'leftPanel')
+  expandedNotes: selectors.getExpandedNotes(state)
 });
 
 export default connect(mapStatesToProps)(translate()(NotesPanel));
