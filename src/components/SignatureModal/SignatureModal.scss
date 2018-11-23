@@ -6,7 +6,8 @@
 
   .container {
     @extend %modal-shared-container-style;
-
+    display: flex;
+    flex-direction: column;
     width: calc(100% - 20px);
     max-width: 600px;
     height: calc(100% - 80px);
@@ -26,6 +27,47 @@
     .footer {
       display: flex;
       justify-content: space-between;
+    }
+
+    .footer__sign {
+      display: flex;
+      align-items: center;
+
+      input {
+        align-self: center;
+      }
+
+      p {
+        margin: 0px 3px;
+      }
+    }
+
+    .default-signatures-modal {
+      flex-grow: 1;
+      overflow: auto;
+
+      .wrapper {
+        display: flex;
+        justify-content: center;
+        position: relative;
+        height: 200px;
+
+        .signature-image {
+          width: 80%;
+          height: 100%;
+        }
+
+        .ActionButton {
+          position: absolute;
+          right: 0;
+          bottom: 0;
+        }
+      }
+
+      .wrapper:hover {
+        cursor: pointer;
+        background-color: $gray4;
+      }
     }
   }
 }
