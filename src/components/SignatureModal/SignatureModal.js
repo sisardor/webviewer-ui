@@ -24,6 +24,7 @@ class SignatureModal extends React.PureComponent {
   constructor() {
     super();
     this.canvas = React.createRef();
+    this.sigBg = React.createRef();
     this.signatureTool = core.getTool('AnnotationCreateSignature');
     this.state = { 
       defaultSignatures: [],
@@ -35,6 +36,12 @@ class SignatureModal extends React.PureComponent {
   componentDidMount() {
     this.signatureTool.on('locationSelected', this.onLocationSelected);
     this.signatureTool.on('annotationAdded', this.onSignatureAdded);
+    // hack, override the original drawBackground to draw nothing on the canvas
+    // so that there's no 'Sign Here' in the image when we use canvas.toDataURL()
+    this.signatureTool.drawBackground = function() {
+      const multiplier = window.utils.getCanvasMultiplier();
+      this.ctx.scale(multiplier, multiplier);
+    };
     this.signatureTool.setSignatureCanvas($(this.canvas.current));
   }
 
@@ -42,6 +49,7 @@ class SignatureModal extends React.PureComponent {
     if (!prevProps.isOpen && this.props.isOpen) {
       if (this.canvas.current) {
         this.updateCanvasSize();
+        this.updateBackgroundSize();
       }
       this.props.closeElements([ 'printModal', 'loadingModal', 'errorModal' ]);
     }
@@ -49,6 +57,7 @@ class SignatureModal extends React.PureComponent {
     if (!prevState.isAddingSignature && this.state.isAddingSignature) {
       this.signatureTool.setSignatureCanvas($(this.canvas.current));
       this.updateCanvasSize();
+      this.updateBackgroundSize();
       this.signatureTool.openSignature();
     }
   }
@@ -67,6 +76,13 @@ class SignatureModal extends React.PureComponent {
     this.canvas.current.height = height * window.utils.getCanvasMultiplier();
   }
 
+  updateBackgroundSize = () => {
+    const { width, height } = window.getComputedStyle(this.canvas.current);
+
+    this.sigBg.current.style.width = width;
+    this.sigBg.current.style.height = height;
+  }
+ 
   onLocationSelected = () => {
     this.props.openElement('signatureModal');
     if (this.canvas.current) {
@@ -165,6 +181,7 @@ class SignatureModal extends React.PureComponent {
   renderAddSignatureModal = () => {
     return(
       <React.Fragment>
+        <div ref={this.sigBg} className="sig-background"><p>Sign Here</p></div>
         <canvas ref={this.canvas}></canvas>
         <div className="footer">
           <ActionButton dataElement="signatureModalClearButton" title="action.clear" img="ic_delete_black_24px" onClick={this.clearCanvas} />
