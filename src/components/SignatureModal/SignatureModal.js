@@ -36,6 +36,7 @@ class SignatureModal extends React.PureComponent {
   componentDidMount() {
     this.signatureTool.on('locationSelected', this.onLocationSelected);
     this.signatureTool.on('annotationAdded', this.onSignatureAdded);
+    this.signatureTool.on('saveDefault', this.onSaveDefault);
     // hack, override the original drawBackground to draw nothing on the canvas
     // so that there's no 'Sign Here' in the image when we use canvas.toDataURL()
     this.signatureTool.drawBackground = function() {
@@ -56,6 +57,7 @@ class SignatureModal extends React.PureComponent {
     
     if (!prevState.isAddingSignature && this.state.isAddingSignature) {
       this.signatureTool.setSignatureCanvas($(this.canvas.current));
+      this.signatureTool.clearSignatureCanvas();
       this.updateCanvasSize();
       this.updateBackgroundSize();
       this.signatureTool.openSignature();
@@ -65,6 +67,7 @@ class SignatureModal extends React.PureComponent {
   componentWillUnmount() {
     this.signatureTool.off('locationSelected', this.onLocationSelected);
     this.signatureTool.off('annotationAdded', this.onSignatureAdded);
+    this.signatureTool.off('saveDefault', this.onSaveDefault);
   }
 
   updateCanvasSize = () => {
@@ -89,35 +92,34 @@ class SignatureModal extends React.PureComponent {
       this.signatureTool.openSignature();
     }
   }
-  
-  onSignatureAdded = (e, signatureAnnotation) => {
-    const defaultSignatures = [ ...this.state.defaultSignatures ];
 
-    if (this.state.isStoringSignature && !signatureAnnotation.isCopy) {
-      const defaultSignature = {
-        Id: signatureAnnotation.Id,
-        img: this.getSignatureImage(signatureAnnotation)
-      };
-      
-      defaultSignatures.push(defaultSignature);
-      this.setState({ defaultSignatures });
-    }
-    this.setState({ isAddingSignature: !defaultSignatures.length });
-
-    setTimeout(() => {
-      this.signatureTool.clearSignatureCanvas();
-    }, 0);
-  }
-
-  getSignatureImage = signatureAnnotation => {
+  getSignatureImage = index => {
     return (
       <img 
         className="signature-image"
         src={this.canvas.current.toDataURL()} 
-        onClick={() => this.addDefaultSignature(signatureAnnotation)}
+        onClick={() => this.addDefaultSignature(index)}
       >
       </img>
     );
+  }
+
+  onSaveDefault = (e, paths) => {
+    const defaultSignatures = [ ...this.state.defaultSignatures ];
+    const defaultSignature = {
+      img: this.getSignatureImage(defaultSignatures.length),
+      paths
+    };
+
+    defaultSignatures.push(defaultSignature);
+    this.setState({ 
+      defaultSignatures,
+      isAddingSignature: !defaultSignatures.length
+    });
+    console.log(!defaultSignatures.length);
+    setTimeout(() => {
+      this.signatureTool.clearSignatureCanvas();
+    }, 0);
   }
 
   closeModal = () => {
@@ -131,18 +133,34 @@ class SignatureModal extends React.PureComponent {
   }
   
   addSignature = () => {
-    this.signatureTool.addSignature();
-    this.props.closeElement('signatureModal');
+    const { isStoringSignature, defaultSignatures } = this.state;
+    this.signatureTool.addSignature(isStoringSignature);
+    this.closeModal();
+
+    if (!isStoringSignature) {
+      this.setState({
+        isAddingSignature: !defaultSignatures.length
+      });
+    }
   }
 
-  addDefaultSignature = signatureAnnotation => {
-    const annotationCopy = window.docViewer.getAnnotationManager().getAnnotationCopy(signatureAnnotation);
-    annotationCopy.isCopy = true; // hack, mark it as a copy annotation so that we don't store it
-    this.signatureTool.freeHandAnnot = annotationCopy;
-    this.signatureTool.Gv = this.signatureTool.freeHandAnnot.getPaths().length;
-    this.signatureTool.addSignature();
+  addDefaultSignature = index => {
+    const { paths } = this.state.defaultSignatures[index];
+
+    this.signatureTool.initDefaultSignature(paths);
+    this.signatureTool.addDefaultSignature();
 
     this.props.closeElement('signatureModal');
+  }
+  
+  deleteDefaultSignature = index => {
+    const defaultSignatures = [ ...this.state.defaultSignatures ];
+    
+    defaultSignatures.splice(index, 1);
+    this.setState({
+      defaultSignatures,
+      isAddingSignature: !defaultSignatures.length 
+    });
   }
 
   handleCheckboxChange = () => {
@@ -155,15 +173,6 @@ class SignatureModal extends React.PureComponent {
     this.setState(prevState => ({
       isAddingSignature: !prevState.isAddingSignature
     }));
-  }
-
-  deleteDefaultSignature = Id => {
-    const defaultSignatures = this.state.defaultSignatures.filter(signature => signature.Id !== Id);
-
-    this.setState({
-      defaultSignatures,
-      isAddingSignature: !defaultSignatures.length 
-    });
   }
 
   renderSwitchModalButton = () => {
@@ -199,10 +208,10 @@ class SignatureModal extends React.PureComponent {
     return (
       <React.Fragment>
         <div className="default-signatures-modal">
-          {this.state.defaultSignatures.map(({ Id, img }) => (
-            <div key={Id} className="wrapper">
+          {this.state.defaultSignatures.map(({ img }, index) => (
+            <div key={index} className="wrapper">
               {img}
-              <ActionButton dataElement="signatureModalDeleteButton" title="action.delete" img="ic_delete_black_24px" onClick={() => this.deleteDefaultSignature(Id)} />
+              <ActionButton dataElement="signatureModalDeleteButton" title="action.delete" img="ic_delete_black_24px" onClick={() => this.deleteDefaultSignature(index)} />
             </div>
           ))}
         </div>
@@ -211,6 +220,7 @@ class SignatureModal extends React.PureComponent {
   }
   
   render() {
+    console.log(this.state.isAddingSignature);
     if (this.props.isDisabled) {
       return null;
     }
