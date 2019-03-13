@@ -200,7 +200,7 @@ describe('Test extension in url', () => {
       spy = cy.spy()
       win.readerControl.docViewer.on('documentLoaded', spy)
       cy.wrap(null).then(() => {
-        return waitOneSecond(3000).then(() => {
+        return waitOneSecond(2000).then(() => {
           expect(spy).to.be.called.once;
         })
       })
