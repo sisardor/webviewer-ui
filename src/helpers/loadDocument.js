@@ -24,7 +24,7 @@ export default (state, dispatch) => {
               dispatch(actions.setDocumentLoadingProgress(loaded / total));
             });
           }
-          
+
           partRetriever.on('error', function(e, type, message) {
             fireError(message);
           });
