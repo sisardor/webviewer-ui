@@ -15,6 +15,7 @@ function waitOneSecond(time) {
 }
 
 
+
 describe('Test extension and preloadWorker options', () => {
   // beforeEach(() => {
   //   cy.visit(WebViewerUrl + '#d=/files/png_file&a=1');
@@ -201,6 +202,7 @@ describe('Test extension in url', () => {
       win.readerControl.docViewer.on('documentLoaded', spy)
       cy.wrap(null).then(() => {
         return waitOneSecond(3000).then(() => {
+
           expect(spy).to.be.called.once;
         })
       })
