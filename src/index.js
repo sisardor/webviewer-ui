@@ -93,21 +93,13 @@ if (window.CanvasRenderingContext2D) {
   if (preloadWorker) {
     if (preloadWorker === PDF || preloadWorker === ALL) {
       getBackendPromise(state.document.pdfType).then(pdfType => {
-        window.CoreControls.initPDFWorkerTransports(pdfType, {
-          workerLoadingProgress: percent => {
-            store.dispatch(actions.setWorkerLoadingProgress(percent));
-          }
-        }, window.sampleL);
+        window.CoreControls.initPDFWorkerTransports(pdfType, {}, window.sampleL);
       });
     }
 
     if (preloadWorker === OFFICE || preloadWorker === ALL) {
       getBackendPromise(state.document.officeType).then(officeType => {
-        window.CoreControls.initOfficeWorkerTransports(officeType, {
-          workerLoadingProgress: percent => {
-            store.dispatch(actions.setWorkerLoadingProgress(percent));
-          }
-        }, window.sampleL);
+        window.CoreControls.initOfficeWorkerTransports(officeType, {}, window.sampleL);
       });
     }
   }
