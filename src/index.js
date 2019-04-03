@@ -7,12 +7,13 @@ import i18next from 'i18next';
 import thunk from 'redux-thunk';
 
 import core from 'core';
+import actions from 'actions';
 
 import apis from 'src/apis';
 
 import App from 'components/App';
 import rootReducer from 'reducers/rootReducer';
-import { engineTypes } from 'constants/types';
+import { engineTypes, workerTypes } from 'constants/types';
 import LayoutMode from 'constants/layoutMode';
 import FitMode from 'constants/fitMode';
 import defaultTool from 'constants/defaultTool';
@@ -38,6 +39,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const store = createStore(rootReducer, applyMiddleware(...middleware));
+
 
 if (process.env.NODE_ENV === 'development' && module.hot) {
   module.hot.accept('reducers/rootReducer', () => {
@@ -85,16 +87,27 @@ if (window.CanvasRenderingContext2D) {
     }
   }
 
-  if (state.advanced.preloadWorker && state.advanced.engineType === engineTypes.PDFNETJS) {
-    if (state.document.pdfType !== 'wait') {
+  const { preloadWorker } = state.advanced;
+  const { PDF, OFFICE, ALL } = workerTypes;
+
+  if (preloadWorker) {
+    if (preloadWorker === PDF || preloadWorker === ALL) {
       getBackendPromise(state.document.pdfType).then(pdfType => {
-        window.CoreControls.initPDFWorkerTransports(pdfType, {}, null);
+        window.CoreControls.initPDFWorkerTransports(pdfType, {
+          workerLoadingProgress: percent => {
+            store.dispatch(actions.setWorkerLoadingProgress(percent));
+          }
+        }, window.sampleL);
       });
     }
 
-    if (state.document.officeType !== 'wait') {
+    if (preloadWorker === OFFICE || preloadWorker === ALL) {
       getBackendPromise(state.document.officeType).then(officeType => {
-        window.CoreControls.preloadOfficeWorker(officeType, {}, {});
+        window.CoreControls.initOfficeWorkerTransports(officeType, {
+          workerLoadingProgress: percent => {
+            store.dispatch(actions.setWorkerLoadingProgress(percent));
+          }
+        }, window.sampleL);
       });
     }
   }
